@@ -101,30 +101,44 @@ class RecordedRequest @JvmOverloads constructor(
       val pathEnd = requestLine.indexOf(' ', methodEnd + 1)
       this.method = requestLine.substring(0, methodEnd)
       var path = requestLine.substring(methodEnd + 1, pathEnd)
-      if (!path.startsWith("/")) {
-        path = "/"
-      }
-      this.path = path
 
-      // Eagerly get the address, but avoid potentially variable latency with DNS lookups
-      // See https://github.com/square/okhttp/issues/4836
-      val inetAddress = socket.localAddress
-      this.requestUrlFn = {
-        val scheme = if (socket is SSLSocket) "https" else "http"
-
-        var hostname = inetAddress.hostName
-        if (inetAddress is Inet6Address && hostname.contains(':')) {
-          // hostname is likely some form representing the IPv6 bytes
-          // 2001:0db8:85a3:0000:0000:8a2e:0370:7334
-          // 2001:db8:85a3::8a2e:370:7334
-          // ::1
-          hostname = "[$hostname]"
+      // If the request starts with http or https
+      // Instead of parsing it into /path in local
+      // We keep the path
+      // @TODO: Need to verify it's indeeded the ask
+      // https://github.com/square/okhttp/issues/3638
+      if (path.startsWith("https") || path.startsWith("http")) {
+        this.requestUrlFn = {
+          path.toHttpUrlOrNull();
         }
+        this.path = path
+      } else {
+        if (!path.startsWith("/")) {
+          path = "/"
+        }
+        this.path = path
 
-        val localPort = socket.localPort
-        // Allow null in failure case to allow for testing bad requests
-        "$scheme://$hostname:$localPort$path".toHttpUrlOrNull()
+        // Eagerly get the address, but avoid potentially variable latency with DNS lookups
+        // See https://github.com/square/okhttp/issues/4836
+        val inetAddress = socket.localAddress
+        this.requestUrlFn = {
+          val scheme = if (socket is SSLSocket) "https" else "http"
+
+          var hostname = inetAddress.hostName
+          if (inetAddress is Inet6Address && hostname.contains(':')) {
+            // hostname is likely some form representing the IPv6 bytes
+            // 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+            // 2001:db8:85a3::8a2e:370:7334
+            // ::1
+            hostname = "[$hostname]"
+          }
+
+          val localPort = socket.localPort
+          // Allow null in failure case to allow for testing bad requests
+          "$scheme://$hostname:$localPort$path".toHttpUrlOrNull()
+        }
       }
+
     } else {
       this.method = null
       this.path = null
