@@ -334,6 +334,21 @@ class MockWebServer : Closeable {
   fun takeRequest(timeout: Long, unit: TimeUnit): RecordedRequest? =
       requestQueue.poll(timeout, unit)
 
+  /**
+   * Take a list of request from the queue, so user can pick any request from the queue
+   * @return the list of all request in the queue
+   */
+  @Throws(InterruptedException::class)
+  fun takeRequestList(): MutableList<RecordedRequest>? {
+    val list: MutableList<RecordedRequest> = ArrayList()
+    while (requestQueue.peek() != null) list.add(requestQueue.poll())
+    if (list.size == 0) return null
+    return list
+  }
+
+
+
+
   @JvmName("-deprecated_requestCount")
   @Deprecated(
       message = "moved to val",
